@@ -86,3 +86,11 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "fuel-route",
+        "TIMEOUT": 3600,
+    }
+}
