@@ -1,3 +1,4 @@
+import csv
 import json
 import re
 from collections import defaultdict
@@ -14,6 +15,20 @@ def normalize(value):
     return re.sub(r"[^a-z0-9]", "", str(value).lower())
 
 
+def export_exact_coordinates(path):
+    # Committed so a fresh database can restore matches without OSM files.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["opis_id", "latitude", "longitude"])
+        writer.writerows(
+            Station.objects.filter(
+                coordinate_source=Station.CoordinateSource.STATION)
+            .order_by("opis_id")
+            .values_list("opis_id", "latitude", "longitude")
+        )
+
+
 class Command(BaseCommand):
     help = "Match OSM coordinates by brand, branch number, city, and state."
 
@@ -21,6 +36,10 @@ class Command(BaseCommand):
         parser.add_argument("input_path", type=Path)
         parser.add_argument("--state", required=True)
         parser.add_argument("--apply", action="store_true")
+        parser.add_argument("--export", type=Path,
+                            default=Path("data/station-coordinates.csv"),
+                            help="With --apply, rewrite this file with every "
+                                 "exact station coordinate.")
 
     def handle(self, *args, **options):
         state = options["state"].upper()
@@ -73,9 +92,10 @@ class Command(BaseCommand):
         stations = (
             Station.objects.filter(
                 state=state,
-                latitude__isnull=True,
-                longitude__isnull=True,
                 prices__isnull=False,
+            )
+            .exclude(
+                coordinate_source=Station.CoordinateSource.STATION,
             )
             .distinct()
             .order_by("opis_id")
@@ -113,6 +133,7 @@ class Command(BaseCommand):
             latitude, longitude = candidates[0]
             station.latitude = latitude
             station.longitude = longitude
+            station.coordinate_source = Station.CoordinateSource.STATION
             updates.append(station)
 
             self.stdout.write(
@@ -124,9 +145,10 @@ class Command(BaseCommand):
             with transaction.atomic():
                 Station.objects.bulk_update(
                     updates,
-                    ["latitude", "longitude"],
+                    ["latitude", "longitude", "coordinate_source"],
                     batch_size=500,
                 )
+            export_exact_coordinates(options["export"])
 
         action = "Saved" if options["apply"] else "Would save"
         self.stdout.write(self.style.SUCCESS(
