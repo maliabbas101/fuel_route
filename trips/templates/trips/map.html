@@ -144,6 +144,20 @@
       .addTo(results);
   }
 
+  // Flatten {"start": {"non_field_errors": ["..."]}} into "Start: ...".
+  function fieldErrors(errors, label = "") {
+    if (Array.isArray(errors)) {
+      return `${label}: ${errors.join(" ")}`;
+    }
+    return Object.entries(errors)
+      .map(([field, value]) => {
+        const name = field === "non_field_errors" ? "" : field.replaceAll("_", " ");
+        const fullName = [label, name].filter(Boolean).join(" ");
+        return fieldErrors(value, fullName.charAt(0).toUpperCase() + fullName.slice(1));
+      })
+      .join("\n");
+  }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     button.disabled = true;
@@ -193,7 +207,7 @@
       }
 
       if (!response.ok) {
-        throw new Error(data.detail || JSON.stringify(data));
+        throw new Error(data.detail || fieldErrors(data));
       }
 
       for (const stop of data.fuel_stops) {
