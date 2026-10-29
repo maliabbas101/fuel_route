@@ -1,11 +1,17 @@
+import numpy as np
+import shapely
 from django.db.models import Avg
 from pyproj import CRS, Transformer
-from shapely.geometry import LineString, Point
 
 from stations.models import Station
 
+# Exact station points must sit beside the route. City-center points can be a
+# few miles from the highway exit the station is actually on.
+EXACT_CORRIDOR_METERS = 1600
+CITY_CORRIDOR_METERS = 8000
 
-def find_route_stations(geometry, distance_miles, corridor_meters=1600):
+
+def find_route_stations(geometry, distance_miles):
     coordinates = geometry["coordinates"]
 
     # Use a local projection centered on the route.
@@ -22,52 +28,91 @@ def find_route_stations(geometry, distance_miles, corridor_meters=1600):
         always_xy=True,
     )
 
-    projected = [
-        transformer.transform(longitude, latitude)
-        for longitude, latitude, *_ in coordinates
-    ]
+    route = np.asarray([point[:2] for point in coordinates], dtype=float)
+    projected = np.column_stack(transformer.transform(route[:, 0], route[:, 1]))
 
-    line = LineString(projected)
+    starts, ends = projected[:-1], projected[1:]
+    segment_lengths = np.hypot(*(ends - starts).T)
+    route_length = segment_lengths.sum()
 
-    if line.length == 0:
+    if route_length == 0:
         return []
 
-    stations = (
+    segment_offsets = np.concatenate(([0.0], np.cumsum(segment_lengths)[:-1]))
+    segments = shapely.linestrings(np.stack((starts, ends), axis=1))
+
+    # Skip stations outside the route's bounding box before measuring.
+    margin = CITY_CORRIDOR_METERS / 111_000 * 1.5
+    south, north = route[:, 1].min() - margin, route[:, 1].max() + margin
+    lon_margin = margin / max(np.cos(np.radians(max(abs(south), abs(north)))), 0.1)
+    west, east = route[:, 0].min() - lon_margin, route[:, 0].max() + lon_margin
+
+    stations = list(
         Station.objects.filter(
-            latitude__isnull=False,
-            longitude__isnull=False,
+            latitude__range=(south, north),
+            longitude__range=(west, east),
             prices__isnull=False,
         )
         .annotate(route_price=Avg("prices__price_per_gallon"))
+        .values("opis_id", "name", "latitude", "longitude",
+                "coordinate_source", "route_price")
     )
 
-    candidates = []
+    if not stations:
+        return []
 
-    for station in stations:
-        x, y = transformer.transform(
-            float(station.longitude),
-            float(station.latitude),
+    longitudes = np.array([float(s["longitude"]) for s in stations])
+    latitudes = np.array([float(s["latitude"]) for s in stations])
+    xy = np.column_stack(transformer.transform(longitudes, latitudes))
+
+    # Find each station's nearest route segment with a spatial index.
+    (station_index, segment_index), distances = shapely.STRtree(
+        segments).query_nearest(
+            shapely.points(xy),
+            max_distance=CITY_CORRIDOR_METERS,
+            return_distance=True,
+            all_matches=False,
         )
 
-        point = Point(x, y)
+    # Position along the route: segment start plus projection onto it.
+    start = starts[segment_index]
+    direction = ends[segment_index] - start
+    length = segment_lengths[segment_index]
+    along = np.einsum("ij,ij->i", xy[station_index] - start, direction)
+    along = np.clip(along / np.where(length > 0, length, 1), 0, length)
+    miles = np.zeros(len(stations))
+    miles[station_index] = (
+        (segment_offsets[segment_index] + along) / route_length * distance_miles
+    )
 
-        if line.distance(point) > corridor_meters:
-            continue
+    station_distances = np.full(len(stations), np.inf)
+    station_distances[station_index] = distances
 
-        # Scale geometry position to the provider's driving distance.
-        mile = line.project(point) / line.length * distance_miles
+    exact = np.array([
+        s["coordinate_source"] == Station.CoordinateSource.STATION
+        for s in stations
+    ])
+    corridor = np.where(exact, EXACT_CORRIDOR_METERS, CITY_CORRIDOR_METERS)
 
-        # A station at mile zero can supply fuel before departure.
-        if not 0 <= mile < distance_miles:
-            continue
+    # A station at mile zero can supply fuel before departure.
+    keep = (
+        (station_distances <= corridor)
+        & (miles >= 0)
+        & (miles < distance_miles)
+    )
 
-        candidates.append({
-            "id": station.opis_id,
-            "name": station.name,
-            "latitude": float(station.latitude),
-            "longitude": float(station.longitude),
-            "mile": mile,
-            "price": str(station.route_price),
-        })
+    candidates = [
+        {
+            "id": station["opis_id"],
+            "name": station["name"],
+            "latitude": float(station["latitude"]),
+            "longitude": float(station["longitude"]),
+            "location_precision": "exact" if is_exact else "city",
+            "mile": float(mile),
+            "price": str(station["route_price"]),
+        }
+        for station, mile, is_exact, kept in zip(stations, miles, exact, keep)
+        if kept
+    ]
 
     return sorted(candidates, key=lambda station: station["mile"])

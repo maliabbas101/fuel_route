@@ -12,7 +12,11 @@ from django.views.decorators.http import require_POST
 
 from .boundaries import is_in_usa
 from .optimizer import optimize_fuel
-from .stations import find_route_stations
+from .stations import (
+    CITY_CORRIDOR_METERS,
+    EXACT_CORRIDOR_METERS,
+    find_route_stations,
+)
 from django.shortcuts import render
 
 
@@ -179,6 +183,7 @@ def plan_trip(request):
             "name": station["name"],
             "latitude": station["latitude"],
             "longitude": station["longitude"],
+            "location_precision": station["location_precision"],
         })
 
     return JsonResponse({
@@ -193,8 +198,14 @@ def plan_trip(request):
             "initial_fuel_gallons": initial_fuel,
             "starting_fuel_cost_included": False,
             "price_policy": "Average of supplied CSV price rows per station",
-            "station_corridor_meters": 1600,
+            "station_corridor_meters": {
+                "exact": EXACT_CORRIDOR_METERS,
+                "city": CITY_CORRIDOR_METERS,
+            },
             "station_access": "Approximate; road detours are excluded",
-            "coordinate_coverage": "Partial Wisconsin coverage",
+            "station_locations": (
+                "Exact OSM points where matched; otherwise the center of "
+                "the station's city (Census Gazetteer, GeoNames)"
+            ),
         },
     })
