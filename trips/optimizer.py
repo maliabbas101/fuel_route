@@ -97,7 +97,9 @@ def optimize_fuel(distance_miles, stations, initial_fuel_gallons=50):
             gallons_to_buy = max(Decimal("0"), desired_fuel - fuel)
 
             if gallons_to_buy > 0:
-                cost = gallons_to_buy * current["price"]
+                # Each purchase is charged to the cent; the total is their sum.
+                cost = (gallons_to_buy * current["price"]).quantize(
+                    Decimal("0.01"))
                 fuel += gallons_to_buy
                 purchased += gallons_to_buy
                 total_cost += cost
@@ -107,7 +109,7 @@ def optimize_fuel(distance_miles, stations, initial_fuel_gallons=50):
                     "mile": float(position),
                     "gallons_to_buy": float(gallons_to_buy),
                     "price_per_gallon": str(current["price"]),
-                    "cost_usd": str(cost.quantize(Decimal("0.01"))),
+                    "cost_usd": str(cost),
                 })
 
         fuel -= (target["mile"] - position) / MPG
@@ -120,8 +122,6 @@ def optimize_fuel(distance_miles, stations, initial_fuel_gallons=50):
     return {
         "fuel_stops": stops,
         "fuel_purchased_gallons": float(purchased),
-        "fuel_purchase_cost_usd": str(
-            total_cost.quantize(Decimal("0.01"))
-        ),
+        "fuel_purchase_cost_usd": str(total_cost.quantize(Decimal("0.01"))),
         "ending_fuel_gallons": float(fuel),
     }
