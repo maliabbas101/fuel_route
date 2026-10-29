@@ -12,14 +12,19 @@ class FuelHandler(osmium.SimpleHandler):
         self.count = 0
 
     def write_station(self, element, latitude, longitude, method):
-        self.output.write(json.dumps({
-            "osm_type": element.type_str(),
-            "osm_id": element.id,
-            "latitude": latitude,
-            "longitude": longitude,
-            "coordinate_method": method,
-            "tags": dict(element.tags),
-        }) + "\n")
+        self.output.write(
+            json.dumps(
+                {
+                    "osm_type": element.type_str(),
+                    "osm_id": element.id,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "coordinate_method": method,
+                    "tags": dict(element.tags),
+                }
+            )
+            + "\n"
+        )
 
         self.count += 1
 
@@ -40,15 +45,12 @@ class FuelHandler(osmium.SimpleHandler):
             return
 
         locations = [
-            (node.lat, node.lon)
-            for node in way.nodes
-            if node.location.valid()
+            (node.lat, node.lon) for node in way.nodes if node.location.valid()
         ]
 
         if not locations or len(locations) != len(way.nodes):
             return
 
-        # Approximate representative point for a mapped station area.
         latitudes, longitudes = zip(*locations)
 
         self.write_station(
@@ -83,7 +85,6 @@ class Command(BaseCommand):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Exclusive creation avoids overwriting an existing extraction.
             with output_path.open("x", encoding="utf-8") as output:
                 handler = FuelHandler(output)
                 handler.apply_file(str(input_path), locations=True)
@@ -97,6 +98,6 @@ class Command(BaseCommand):
                 "Any partial output must be removed before retrying."
             ) from exc
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Extracted {handler.count} candidates to {output_path}"
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f"Extracted {handler.count} candidates to {output_path}")
+        )
