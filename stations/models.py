@@ -3,9 +3,9 @@ from django.db import models
 
 class StationQuerySet(models.QuerySet):
     def priced_with_coordinates(self):
-        return self.filter(latitude__isnull=False, prices__isnull=False).annotate(
-            average_price=models.Avg("prices__price_per_gallon")
-        )
+        return self.filter(
+            latitude__isnull=False, longitude__isnull=False, prices__isnull=False
+        ).annotate(average_price=models.Avg("prices__price_per_gallon"))
 
 
 class Station(models.Model):

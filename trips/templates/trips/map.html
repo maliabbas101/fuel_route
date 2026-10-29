@@ -200,7 +200,7 @@
         const description =
           `${stop.name}: buy ${Number(stop.gallons_to_buy).toFixed(2)} ` +
           `gallons at $${Number(stop.price).toFixed(3)}/gal. ` +
-          `Cost: $${stop.cost_usd}. ` +
+          `Cost: $${stop.cost_usd.toFixed(2)}. ` +
           `Mile ${Number(stop.mile).toFixed(0)}. ` +
           (stop.location_precision === "exact"
             ? "Exact station location."
@@ -218,7 +218,7 @@
         `Fuel consumed: ${data.fuel_consumed_gallons} gallons\n` +
         `Fuel stops: ${data.fuel_stops.length}\n` +
         `Fuel purchased: ${Number(data.fuel_purchased_gallons).toFixed(2)} gallons\n` +
-        `Purchase cost: $${data.fuel_purchase_cost_usd}\n` +
+        `Purchase cost: $${data.fuel_purchase_cost_usd.toFixed(2)}\n` +
         `Route calculated by openrouteservice.`;
     } catch (error) {
       status.textContent = `Unable to plan trip: ${error.message}`;

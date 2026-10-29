@@ -45,6 +45,8 @@ def find_route_stations(geometry, distance_miles):
     shapely.prepare(corridor)
 
     stations, coordinates = load_stations()
+    if not stations:
+        return []
     points = shapely.points(np.column_stack(to_meters(*coordinates.T)))
 
     inside = np.flatnonzero(shapely.contains(corridor, points))

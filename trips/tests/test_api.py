@@ -120,5 +120,21 @@ class TripPlanApiTests(APITestCase):
         self.assertEqual(response.json()["error"], "NO_FEASIBLE_FUEL_PLAN")
         self.assertIn("route_geojson", response.json())
 
+    def test_reports_no_plan_when_no_station_has_coordinates(self, get_route):
+        Station.objects.update(latitude=None, longitude=None)
+
+        response = self.client.post(self.url, self.body, format="json")
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["candidate_station_count"], 0)
+
+    def test_ignores_stations_missing_a_coordinate(self, get_route):
+        add_station(5, 31.0, "2.00", longitude=None)
+
+        response = self.client.post(self.url, self.body, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["candidate_station_count"], 3)
+
     def test_only_accepts_post(self, get_route):
         self.assertEqual(self.client.get(self.url).status_code, 405)
