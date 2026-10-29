@@ -88,6 +88,16 @@ class TripPlanApiTests(APITestCase):
         self.assertIn("start", response.json())
         get_route.assert_not_called()
 
+    def test_accepts_coastal_points_just_outside_the_generalized_boundary(
+        self, get_route
+    ):
+        # Fort Zachary Taylor, Key West: 111 m outside the 1:5M outline.
+        body = {**self.body, "start": {"latitude": 24.5465, "longitude": -81.8105}}
+
+        response = self.client.post(self.url, body, format="json")
+
+        self.assertEqual(response.status_code, 200)
+
     def test_rejects_invalid_input(self, get_route):
         for body in (
             {**self.body, "initial_fuel_gallons": 60},

@@ -14,4 +14,7 @@ It validates endpoints, not whether the driving route stays within the country.
 
 This is a generalized land/coastline boundary for an assessment prototype, not a
 survey-grade border. Points near coastlines, borders or small islands can be
-misclassified. No buffer is added to admit nearby foreign locations.
+misclassified, so points within 1 km of the boundary are also accepted
+(`USA_BOUNDARY_TOLERANCE_METERS`). This admits real coastal points such as Fort
+Zachary Taylor in Key West, but also points within 1 km across the Mexican or
+Canadian border.

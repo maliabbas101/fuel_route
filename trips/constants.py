@@ -6,6 +6,8 @@ METERS_PER_MILE = 1609.344
 EXACT_CORRIDOR_METERS = 1600
 CITY_CORRIDOR_METERS = 8000
 ROUTE_SIMPLIFY_METERS = 100
+# The 1:5,000,000 boundary can put real coastal points just offshore.
+USA_BOUNDARY_TOLERANCE_METERS = 1000
 
 ORS_DIRECTIONS_URL = (
     "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
