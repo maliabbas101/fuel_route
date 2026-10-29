@@ -213,7 +213,16 @@
         stopsList.appendChild(item);
       }
 
+      const snapNotes = [
+        ["Start", data.start_snap_miles],
+        ["Finish", data.finish_snap_miles]
+      ]
+        .filter(([, miles]) => miles >= 0.1)
+        .map(([point, miles]) => `${point} moved ${miles} miles to the nearest road.\n`)
+        .join("");
+
       status.textContent =
+        snapNotes +
         `Distance: ${data.distance_miles} miles\n` +
         `Fuel consumed: ${data.fuel_consumed_gallons} gallons\n` +
         `Fuel stops: ${data.fuel_stops.length}\n` +

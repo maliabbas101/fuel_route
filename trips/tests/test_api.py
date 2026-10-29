@@ -14,6 +14,8 @@ ROUTE = {
     },
     "distance_miles": 345.0,
     "duration_seconds": 18000,
+    "start_snap_miles": 0.0,
+    "finish_snap_miles": 0.0,
 }
 
 

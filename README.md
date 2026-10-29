@@ -63,6 +63,8 @@ openrouteservice key before planning trips.
 inside the USA. The response contains:
 
 - `route_geojson`: the route line.
+- `start_snap_miles` and `finish_snap_miles`: how far each point was moved to
+  reach the nearest road (up to 5 km).
 - `fuel_stops`: each stop's station, mile, gallons bought, price, cost and
   `location_precision` (`exact` or `city`).
 - `distance_miles`, `fuel_consumed_gallons`, `fuel_purchased_gallons` and
@@ -79,6 +81,7 @@ Fuel already in the tank at departure is not included in the cost.
 | 200 | Trip planned. |
 | 400 | Invalid input; errors are listed per field. |
 | 422 | `NO_FEASIBLE_FUEL_PLAN`: no stations close enough to reach the finish. |
+| 422 | No public road within 5 km of a point, no road connects the points, or the route exceeds openrouteservice's 6,000 km limit. |
 | 502 / 503 | The routing service failed, timed out or hit its quota. |
 
 A map that calls this endpoint is at

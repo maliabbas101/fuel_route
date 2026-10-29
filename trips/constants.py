@@ -12,3 +12,10 @@ ORS_DIRECTIONS_URL = (
 )
 ROUTING_TIMEOUT_SECONDS = 20
 ROUTE_CACHE_SECONDS = 3600
+# How far openrouteservice may move a trip point to reach a road.
+ORS_SNAP_RADIUS_METERS = 5000
+
+# openrouteservice error codes caused by the requested points.
+ORS_DISTANCE_LIMIT = 2004
+ORS_ROUTE_NOT_FOUND = 2009
+ORS_NO_ROAD_NEAR_POINT = 2010

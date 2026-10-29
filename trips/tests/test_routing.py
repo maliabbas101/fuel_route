@@ -48,6 +48,26 @@ class GetRouteTests(SimpleTestCase):
         self.assertEqual(
             post.call_args.kwargs["json"]["coordinates"], [[-97.0, 30.0], [-97.0, 32.0]]
         )
+        self.assertEqual(post.call_args.kwargs["json"]["radiuses"], [5000, 5000])
+
+    def test_reports_how_far_points_were_moved_to_a_road(self, post):
+        payload = {
+            "features": [
+                {
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [[-97, 30.01], [-97, 32]],
+                    },
+                    "properties": {"summary": {"distance": 160934.4, "duration": 7200}},
+                }
+            ]
+        }
+        post.return_value = ors_response(payload=payload)
+
+        route, _ = get_route(START, FINISH)
+
+        self.assertAlmostEqual(route["start_snap_miles"], 0.69, places=2)
+        self.assertEqual(route["finish_snap_miles"], 0)
 
     def test_quota_errors_are_reported_as_unavailable(self, post):
         post.return_value = ors_response(status=429)
@@ -62,6 +82,33 @@ class GetRouteTests(SimpleTestCase):
         with self.assertRaises(RoutingError) as error:
             get_route(START, FINISH)
         self.assertEqual(error.exception.status, 502)
+
+    def test_point_without_nearby_road_is_named_in_the_error(self, post):
+        post.return_value = ors_response(
+            status=404,
+            payload={
+                "error": {
+                    "code": 2010,
+                    "message": "Could not find routable point within a radius "
+                    "of 350.0 meters of specified coordinate 1: -124.7 48.4.",
+                }
+            },
+        )
+
+        with self.assertRaises(RoutingError) as error:
+            get_route(START, FINISH)
+        self.assertEqual(error.exception.status, 422)
+        self.assertIn("finish point", str(error.exception))
+
+    def test_route_over_distance_limit_is_unprocessable(self, post):
+        post.return_value = ors_response(
+            status=400, payload={"error": {"code": 2004, "message": "too long"}}
+        )
+
+        with self.assertRaises(RoutingError) as error:
+            get_route(START, FINISH)
+        self.assertEqual(error.exception.status, 422)
+        self.assertIn("6,000 km", str(error.exception))
 
     def test_timeouts_are_reported_as_unavailable(self, post):
         post.side_effect = requests.Timeout()

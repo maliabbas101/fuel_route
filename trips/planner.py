@@ -16,6 +16,8 @@ def plan_trip(start, finish, start_fuel):
         "duration_seconds": route["duration_seconds"],
         "fuel_consumed_gallons": round(distance / MPG, 2),
         "route_geojson": route["geometry"],
+        "start_snap_miles": route["start_snap_miles"],
+        "finish_snap_miles": route["finish_snap_miles"],
         "candidate_station_count": len(stations),
         "route_cache_hit": cache_hit,
     }
