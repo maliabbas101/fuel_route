@@ -2,6 +2,14 @@ MPG = 10
 TANK_GALLONS = 50
 MAX_RANGE_MILES = MPG * TANK_GALLONS
 
+# Stations cover the contiguous USA only, so trips must start and end inside it.
+CONTIGUOUS_USA_BOUNDS = {
+    "min_latitude": 24,
+    "max_latitude": 50,
+    "min_longitude": -125,
+    "max_longitude": -66,
+}
+
 METERS_PER_MILE = 1609.344
 EXACT_CORRIDOR_METERS = 1600
 CITY_CORRIDOR_METERS = 8000

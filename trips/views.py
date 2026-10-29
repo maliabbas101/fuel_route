@@ -4,12 +4,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import planner
+from .constants import CONTIGUOUS_USA_BOUNDS
 from .exceptions import NoFeasiblePlanError, RoutingError
 from .serializers import TripRequestSerializer
 
 
 def trip_map(request):
-    return render(request, "trips/map.html")
+    return render(request, "trips/map.html", {"bounds": CONTIGUOUS_USA_BOUNDS})
 
 
 class TripPlanView(APIView):

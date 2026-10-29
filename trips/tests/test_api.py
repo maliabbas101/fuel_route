@@ -98,6 +98,18 @@ class TripPlanApiTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_rejects_positive_longitudes_with_a_sign_hint(self, get_route):
+        body = {**self.body, "finish": {"latitude": 48.3831, "longitude": 124.7142}}
+
+        response = self.client.post(self.url, body, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(
+            "Western longitudes are negative",
+            response.json()["finish"]["longitude"][0],
+        )
+        get_route.assert_not_called()
+
     def test_rejects_invalid_input(self, get_route):
         for body in (
             {**self.body, "initial_fuel_gallons": 60},

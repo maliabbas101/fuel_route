@@ -69,25 +69,25 @@
     <label>
       Start latitude
       <input id="start-lat" type="number" step="any"
-             min="-90" max="90" value="44.0188755" required>
+             min="{{ bounds.min_latitude }}" max="{{ bounds.max_latitude }}" value="44.0188755" required>
     </label>
 
     <label>
       Start longitude
       <input id="start-lon" type="number" step="any"
-             min="-180" max="180" value="-90.50256145" required>
+             min="{{ bounds.min_longitude }}" max="{{ bounds.max_longitude }}" value="-90.50256145" required>
     </label>
 
     <label>
       Finish latitude
       <input id="finish-lat" type="number" step="any"
-             min="-90" max="90" value="43.0731" required>
+             min="{{ bounds.min_latitude }}" max="{{ bounds.max_latitude }}" value="43.0731" required>
     </label>
 
     <label>
       Finish longitude
       <input id="finish-lon" type="number" step="any"
-             min="-180" max="180" value="-89.4012" required>
+             min="{{ bounds.min_longitude }}" max="{{ bounds.max_longitude }}" value="-89.4012" required>
     </label>
 
     <label>

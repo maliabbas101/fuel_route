@@ -60,7 +60,8 @@ openrouteservice key before planning trips.
 ```
 
 `initial_fuel_gallons` is optional (0 to 50, default 50). Both points must be
-inside the USA. The response contains:
+inside the contiguous USA: latitude 24 to 50 and longitude -125 to -66
+(western longitudes are negative). The response contains:
 
 - `route_geojson`: the route line.
 - `start_snap_miles` and `finish_snap_miles`: how far each point was moved to
