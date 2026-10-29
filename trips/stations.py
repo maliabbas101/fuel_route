@@ -1,118 +1,66 @@
+from functools import lru_cache
+
 import numpy as np
 import shapely
-from django.db.models import Avg
-from pyproj import CRS, Transformer
 
 from stations.models import Station
 
-# Exact station points must sit beside the route. City-center points can be a
-# few miles from the highway exit the station is actually on.
-EXACT_CORRIDOR_METERS = 1600
-CITY_CORRIDOR_METERS = 8000
+from .constants import (
+    CITY_CORRIDOR_METERS,
+    EXACT_CORRIDOR_METERS,
+    ROUTE_SIMPLIFY_METERS,
+)
+from .geo import meters_projection
+
+
+@lru_cache(maxsize=1)
+def load_stations():
+    """All priced stations with coordinates, loaded once per process."""
+    stations = [
+        {
+            "id": station.opis_id,
+            "name": station.name,
+            "latitude": float(station.latitude),
+            "longitude": float(station.longitude),
+            "location_precision": "exact" if station.has_exact_location else "city",
+            "price": float(station.average_price),
+        }
+        for station in Station.objects.priced_with_coordinates()
+    ]
+    coordinates = np.array([[s["longitude"], s["latitude"]] for s in stations])
+    return stations, coordinates
 
 
 def find_route_stations(geometry, distance_miles):
-    coordinates = geometry["coordinates"]
+    """Stations near the route, each with its mile along the route."""
+    route = np.array(geometry["coordinates"])[:, :2]
+    to_meters = meters_projection(*route[len(route) // 2])
 
-    # Use a local projection centered on the route.
-    center = coordinates[len(coordinates) // 2]
-
-    projection = CRS.from_proj4(
-        f"+proj=aeqd +lat_0={center[1]} +lon_0={center[0]} "
-        "+datum=WGS84 +units=m"
+    line = shapely.LineString(np.column_stack(to_meters(*route.T))).simplify(
+        ROUTE_SIMPLIFY_METERS, preserve_topology=False
     )
-
-    transformer = Transformer.from_crs(
-        "EPSG:4326",
-        projection,
-        always_xy=True,
-    )
-
-    route = np.asarray([point[:2] for point in coordinates], dtype=float)
-    projected = np.column_stack(transformer.transform(route[:, 0], route[:, 1]))
-
-    starts, ends = projected[:-1], projected[1:]
-    segment_lengths = np.hypot(*(ends - starts).T)
-    route_length = segment_lengths.sum()
-
-    if route_length == 0:
+    if line.length == 0:
         return []
+    corridor = line.buffer(CITY_CORRIDOR_METERS)
+    shapely.prepare(corridor)
 
-    segment_offsets = np.concatenate(([0.0], np.cumsum(segment_lengths)[:-1]))
-    segments = shapely.linestrings(np.stack((starts, ends), axis=1))
+    stations, coordinates = load_stations()
+    points = shapely.points(np.column_stack(to_meters(*coordinates.T)))
 
-    # Skip stations outside the route's bounding box before measuring.
-    margin = CITY_CORRIDOR_METERS / 111_000 * 1.5
-    south, north = route[:, 1].min() - margin, route[:, 1].max() + margin
-    lon_margin = margin / max(np.cos(np.radians(max(abs(south), abs(north)))), 0.1)
-    west, east = route[:, 0].min() - lon_margin, route[:, 0].max() + lon_margin
-
-    stations = list(
-        Station.objects.filter(
-            latitude__range=(south, north),
-            longitude__range=(west, east),
-            prices__isnull=False,
-        )
-        .annotate(route_price=Avg("prices__price_per_gallon"))
-        .values("opis_id", "name", "latitude", "longitude",
-                "coordinate_source", "route_price")
+    inside = np.flatnonzero(shapely.contains(corridor, points))
+    distances = shapely.distance(line, points[inside])
+    miles = (
+        shapely.line_locate_point(line, points[inside]) / line.length * distance_miles
     )
 
-    if not stations:
-        return []
-
-    longitudes = np.array([float(s["longitude"]) for s in stations])
-    latitudes = np.array([float(s["latitude"]) for s in stations])
-    xy = np.column_stack(transformer.transform(longitudes, latitudes))
-
-    # Find each station's nearest route segment with a spatial index.
-    (station_index, segment_index), distances = shapely.STRtree(
-        segments).query_nearest(
-            shapely.points(xy),
-            max_distance=CITY_CORRIDOR_METERS,
-            return_distance=True,
-            all_matches=False,
-        )
-
-    # Position along the route: segment start plus projection onto it.
-    start = starts[segment_index]
-    direction = ends[segment_index] - start
-    length = segment_lengths[segment_index]
-    along = np.einsum("ij,ij->i", xy[station_index] - start, direction)
-    along = np.clip(along / np.where(length > 0, length, 1), 0, length)
-    miles = np.zeros(len(stations))
-    miles[station_index] = (
-        (segment_offsets[segment_index] + along) / route_length * distance_miles
-    )
-
-    station_distances = np.full(len(stations), np.inf)
-    station_distances[station_index] = distances
-
-    exact = np.array([
-        s["coordinate_source"] == Station.CoordinateSource.STATION
-        for s in stations
-    ])
-    corridor = np.where(exact, EXACT_CORRIDOR_METERS, CITY_CORRIDOR_METERS)
-
-    # A station at mile zero can supply fuel before departure.
-    keep = (
-        (station_distances <= corridor)
-        & (miles >= 0)
-        & (miles < distance_miles)
-    )
-
-    candidates = [
-        {
-            "id": station["opis_id"],
-            "name": station["name"],
-            "latitude": float(station["latitude"]),
-            "longitude": float(station["longitude"]),
-            "location_precision": "exact" if is_exact else "city",
-            "mile": float(mile),
-            "price": str(station["route_price"]),
-        }
-        for station, mile, is_exact, kept in zip(stations, miles, exact, keep)
-        if kept
-    ]
-
-    return sorted(candidates, key=lambda station: station["mile"])
+    candidates = []
+    for i, distance, mile in zip(inside, distances, miles):
+        station = stations[i]
+        if (
+            station["location_precision"] == "exact"
+            and distance > EXACT_CORRIDOR_METERS
+        ):
+            continue
+        if mile < distance_miles:
+            candidates.append({**station, "mile": float(mile)})
+    return candidates

@@ -193,13 +193,13 @@
       }
 
       if (!response.ok) {
-        throw new Error(data.detail || data.error || "Trip planning failed.");
+        throw new Error(data.detail || JSON.stringify(data));
       }
 
       for (const stop of data.fuel_stops) {
         const description =
           `${stop.name}: buy ${Number(stop.gallons_to_buy).toFixed(2)} ` +
-          `gallons at $${Number(stop.price_per_gallon).toFixed(3)}/gal. ` +
+          `gallons at $${Number(stop.price).toFixed(3)}/gal. ` +
           `Cost: $${stop.cost_usd}. ` +
           `Mile ${Number(stop.mile).toFixed(0)}. ` +
           (stop.location_precision === "exact"

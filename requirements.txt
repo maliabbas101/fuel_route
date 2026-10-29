@@ -1,8 +1,14 @@
 asgiref==3.13.0
 Django==6.1.2
+djangorestframework==3.18.3
 sqlparse==0.6.0
 tzdata==2026.5
 python-dotenv==1.2.4
+requests==2.34.2
+certifi==2026.10.23
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0
 osmium==4.3.2
 shapely==2.2.0
 pyproj==3.8.0
