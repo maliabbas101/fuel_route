@@ -100,8 +100,9 @@
   </form>
 
   <p>
-    Current station coverage is limited to matched Wisconsin stations.
-    Station access distances exclude road detours.
+    Stations cover the contiguous USA. Most station positions are the center
+    of the station's city, not the station itself; stops marked "approximate"
+    use a city center. Station access distances exclude road detours.
     Purchase cost excludes fuel already in the tank.
   </p>
 
@@ -115,7 +116,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  const map = L.map("map").setView([44, -90], 7);
+  const map = L.map("map").setView([39.5, -98.35], 4);
 
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
@@ -199,7 +200,11 @@
         const description =
           `${stop.name}: buy ${Number(stop.gallons_to_buy).toFixed(2)} ` +
           `gallons at $${Number(stop.price_per_gallon).toFixed(3)}/gal. ` +
-          `Cost: $${stop.cost_usd}.`;
+          `Cost: $${stop.cost_usd}. ` +
+          `Mile ${Number(stop.mile).toFixed(0)}. ` +
+          (stop.location_precision === "exact"
+            ? "Exact station location."
+            : "Approximate location (city center).");
 
         addMarker(stop.latitude, stop.longitude, description);
 
