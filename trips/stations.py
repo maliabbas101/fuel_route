@@ -57,7 +57,8 @@ def find_route_stations(geometry, distance_miles, corridor_meters=1600):
         # Scale geometry position to the provider's driving distance.
         mile = line.project(point) / line.length * distance_miles
 
-        if not 0 < mile < distance_miles:
+        # A station at mile zero can supply fuel before departure.
+        if not 0 <= mile < distance_miles:
             continue
 
         candidates.append({

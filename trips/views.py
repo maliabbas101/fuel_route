@@ -48,6 +48,17 @@ def plan_trip(request):
         start = validate_location(payload.get("start"))
         finish = validate_location(payload.get("finish"))
 
+        initial_fuel = payload.get("initial_fuel_gallons", 50)
+        if (
+            isinstance(initial_fuel, bool)
+            or not isinstance(initial_fuel, (int, float))
+            or not math.isfinite(initial_fuel)
+            or not 0 <= initial_fuel <= 50
+        ):
+            raise ValueError(
+                "initial_fuel_gallons must be a number between 0 and 50."
+            )
+
     except (ValueError, UnicodeDecodeError) as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
@@ -119,7 +130,11 @@ def plan_trip(request):
     candidates = find_route_stations(geometry, distance_miles)
 
     try:
-        fuel_plan = optimize_fuel(distance_miles, candidates)
+        fuel_plan = optimize_fuel(
+            distance_miles,
+            candidates,
+            initial_fuel_gallons=initial_fuel,
+        )
     except ValueError as exc:
         return JsonResponse({
             "error": "NO_FEASIBLE_FUEL_PLAN",
@@ -147,7 +162,7 @@ def plan_trip(request):
         "candidate_station_count": len(candidates),
         **fuel_plan,
         "assumptions": {
-            "initial_fuel_gallons": 50,
+            "initial_fuel_gallons": initial_fuel,
             "starting_fuel_cost_included": False,
             "price_policy": "Average of supplied CSV price rows per station",
             "station_corridor_meters": 1600,
