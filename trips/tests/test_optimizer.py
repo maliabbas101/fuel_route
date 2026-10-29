@@ -49,9 +49,19 @@ class PlanFuelStopsTests(SimpleTestCase):
         self.assertEqual(plan["fuel_stops"][0]["id"], "B")
 
     def test_fails_when_a_gap_exceeds_the_vehicle_range(self):
-        with self.assertRaises(NoFeasiblePlanError):
+        with self.assertRaises(NoFeasiblePlanError) as error:
             plan_fuel_stops(1200, [station("A", 0, 3.0), station("B", 600, 3.0)], 0)
+        self.assertEqual(
+            str(error.exception),
+            "No fuel station in the 600 miles after mile 0; "
+            "the vehicle range is 500 miles.",
+        )
 
     def test_fails_when_starting_fuel_reaches_no_station(self):
-        with self.assertRaises(NoFeasiblePlanError):
+        with self.assertRaises(NoFeasiblePlanError) as error:
             plan_fuel_stops(300, [station("A", 100, 3.0)], start_fuel=5)
+        self.assertEqual(
+            str(error.exception),
+            "The first fuel station on the route is 100 miles away, beyond what "
+            "the starting fuel covers. Start with at least 10.0 gallons.",
+        )

@@ -19,7 +19,7 @@ def plan_fuel_stops(distance, stations, start_fuel):
         range_miles = MAX_RANGE_MILES if current else fuel * MPG
         reachable = [s for s in ahead if s["mile"] <= position + range_miles]
         if not reachable:
-            raise NoFeasiblePlanError("No fuel station within range.")
+            raise NoFeasiblePlanError(out_of_range_reason(position, ahead[0], current))
 
         cheaper = [s for s in reachable if current and s["price"] < current["price"]]
         if cheaper:
@@ -48,3 +48,19 @@ def plan_fuel_stops(distance, stations, start_fuel):
         "fuel_purchased_gallons": round(sum(s["gallons_to_buy"] for s in stops), 2),
         "fuel_purchase_cost_usd": round(sum(s["cost_usd"] for s in stops), 2),
     }
+
+
+def out_of_range_reason(position, next_stop, current):
+    """Explain why the next station or the finish cannot be reached."""
+    gap = next_stop["mile"] - position
+    target = "fuel station on the route" if "id" in next_stop else "finish"
+    if current is None:
+        first = "first " if "id" in next_stop else ""
+        return (
+            f"The {first}{target} is {gap:.0f} miles away, beyond what the "
+            f"starting fuel covers. Start with at least {gap / MPG:.1f} gallons."
+        )
+    return (
+        f"No fuel station in the {gap:.0f} miles after mile {position:.0f}; "
+        f"the vehicle range is {MAX_RANGE_MILES} miles."
+    )
