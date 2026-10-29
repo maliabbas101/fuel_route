@@ -13,7 +13,8 @@ the stations themselves. See [Station coordinates](#station-coordinates).
 ## Requirements
 
 - Python 3.13.
-- Django 6.1.2 and its dependencies, pinned in `requirements.txt`.
+- Django 6.1.2 and Django REST framework, with all dependencies pinned in
+  `requirements.txt`.
 
 ## Setup
 
@@ -66,14 +67,48 @@ inside the USA. The response contains:
   `location_precision` (`exact` or `city`).
 - `distance_miles`, `fuel_consumed_gallons`, `fuel_purchased_gallons` and
   `fuel_purchase_cost_usd`.
-- `assumptions`: the price policy, search corridors and location sources.
+- `assumptions`: the price policy and station-location sources.
 
-Fuel already in the tank at departure is not included in the cost. When no
-plan can reach the finish, the API returns HTTP 422 with
-`NO_FEASIBLE_FUEL_PLAN`.
+Stations are loaded into memory on the first request, so restart the server
+after re-importing prices or coordinates.
+
+Fuel already in the tank at departure is not included in the cost.
+
+| Status | Meaning |
+| --- | --- |
+| 200 | Trip planned. |
+| 400 | Invalid input; errors are listed per field. |
+| 422 | `NO_FEASIBLE_FUEL_PLAN`: no stations close enough to reach the finish. |
+| 502 / 503 | The routing service failed, timed out or hit its quota. |
 
 A map that calls this endpoint is at
 [http://127.0.0.1:8000/api/trips/map/](http://127.0.0.1:8000/api/trips/map/).
+Opening the endpoint itself in a browser shows Django REST framework's
+browsable API.
+
+## Code layout
+
+| Module | Responsibility |
+| --- | --- |
+| `trips/views.py` | HTTP only: validate the request, call the planner, map errors to status codes |
+| `trips/serializers.py` | Request validation, including the USA boundary check |
+| `trips/planner.py` | Runs route → stations along it → fuel plan |
+| `trips/routing.py` | openrouteservice client with a one-hour route cache |
+| `trips/stations.py` | Finds stations within the corridor and their mile along the route |
+| `trips/optimizer.py` | Greedy cheapest-fuel algorithm, independent of Django |
+| `trips/geo.py` | USA boundary and map-projection helpers |
+| `trips/constants.py`, `trips/exceptions.py` | Shared settings and errors |
+| `stations/` | Models, data-import commands and place-name matching |
+
+## Tests and formatting
+
+The tests mock the routing service, so they need no API key:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test
+.\.venv\Scripts\python.exe -m black --check .
+.\.venv\Scripts\python.exe -m isort --check-only .
+```
 
 ## Fuel-price data
 
