@@ -7,3 +7,5 @@ osmium==4.3.2
 shapely==2.2.0
 pyproj==3.8.0
 numpy==2.5.4
+black==26.10.1
+isort==9.0.2
