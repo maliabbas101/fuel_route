@@ -8,6 +8,9 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from .optimizer import optimize_fuel
+from .stations import find_route_stations
+
 
 def validate_location(value):
     if not isinstance(value, dict):
@@ -113,9 +116,42 @@ def plan_trip(request):
             status=502,
         )
 
+    candidates = find_route_stations(geometry, distance_miles)
+
+    try:
+        fuel_plan = optimize_fuel(distance_miles, candidates)
+    except ValueError as exc:
+        return JsonResponse({
+            "error": "NO_FEASIBLE_FUEL_PLAN",
+            "detail": str(exc),
+            "distance_miles": round(distance_miles, 2),
+            "candidate_station_count": len(candidates),
+            "route_geojson": geometry,
+        }, status=422)
+
+    station_details = {station["id"]: station for station in candidates}
+
+    for stop in fuel_plan["fuel_stops"]:
+        station = station_details[stop["station_id"]]
+        stop.update({
+            "name": station["name"],
+            "latitude": station["latitude"],
+            "longitude": station["longitude"],
+        })
+
     return JsonResponse({
         "distance_miles": round(distance_miles, 2),
         "duration_seconds": duration_seconds,
         "fuel_consumed_gallons": round(fuel_consumed, 2),
         "route_geojson": geometry,
+        "candidate_station_count": len(candidates),
+        **fuel_plan,
+        "assumptions": {
+            "initial_fuel_gallons": 50,
+            "starting_fuel_cost_included": False,
+            "price_policy": "Average of supplied CSV price rows per station",
+            "station_corridor_meters": 1600,
+            "station_access": "Approximate; road detours are excluded",
+            "coordinate_coverage": "Partial Wisconsin coverage",
+        },
     })
