@@ -1,30 +1,18 @@
 import csv
-import math
 from collections import defaultdict
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
+from stations.constants import (
+    AMBIGUITY_MILES,
+    DEFAULT_PLACE_COORDINATES,
+    GEONAMES_SKIPPED_CODES,
+    PLACE_SOURCES,
+    USA_STATES,
+)
 from stations.models import Station
-from stations.places import USA_STATES, census_keys, place_key
-
-# Earlier sources are more authoritative.
-SOURCES = ("census_place", "census_cousub", "geonames")
-
-# Same-named places farther apart than this are left unresolved.
-AMBIGUITY_MILES = 25
-
-# Historical, abandoned and destroyed GeoNames places.
-GEONAMES_SKIPPED_CODES = {"PPLQ", "PPLH", "PPLW", "PPLCH"}
-
-
-def miles_between(a, b):
-    lat1, lon1, lat2, lon2 = map(math.radians, (*a, *b))
-    value = (
-        math.sin(lat1) * math.sin(lat2)
-        + math.cos(lat1) * math.cos(lat2) * math.cos(lon2 - lon1)
-    )
-    return 3958.8 * math.acos(max(-1.0, min(1.0, value)))
+from stations.places import census_keys, miles_between, place_key
 
 
 class Command(BaseCommand):
@@ -34,14 +22,24 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
-        parser.add_argument("--places", type=Path, required=True,
-                            help="Census Gazetteer national places file.")
-        parser.add_argument("--cousubs", type=Path, required=True,
-                            help="Census Gazetteer county subdivisions file.")
-        parser.add_argument("--geonames", type=Path, required=True,
-                            help="GeoNames US.txt dump.")
-        parser.add_argument("--output", type=Path,
-                            default=Path("data/place-coordinates.csv"))
+        parser.add_argument(
+            "--places",
+            type=Path,
+            required=True,
+            help="Census Gazetteer national places file.",
+        )
+        parser.add_argument(
+            "--cousubs",
+            type=Path,
+            required=True,
+            help="Census Gazetteer county subdivisions file.",
+        )
+        parser.add_argument(
+            "--geonames", type=Path, required=True, help="GeoNames US.txt dump."
+        )
+        parser.add_argument(
+            "--output", type=Path, default=Path(DEFAULT_PLACE_COORDINATES)
+        )
 
     def handle(self, *args, **options):
         wanted = {
@@ -65,12 +63,14 @@ class Command(BaseCommand):
                     for row in reader:
                         for key in census_keys(row["NAME"]):
                             if (row["USPS"], key) in wanted:
-                                candidates[row["USPS"], key].append((
-                                    source,
-                                    float(row["INTPTLAT"]),
-                                    float(row["INTPTLONG"]),
-                                    0,
-                                ))
+                                candidates[row["USPS"], key].append(
+                                    (
+                                        source,
+                                        float(row["INTPTLAT"]),
+                                        float(row["INTPTLONG"]),
+                                        0,
+                                    )
+                                )
 
             csv.field_size_limit(2**31 - 1)
             with options["geonames"].open(encoding="utf-8") as file:
@@ -80,12 +80,14 @@ class Command(BaseCommand):
                         continue
                     for key in {place_key(row[1]), place_key(row[2])}:
                         if (row[10], key) in wanted:
-                            candidates[row[10], key].append((
-                                "geonames",
-                                float(row[4]),
-                                float(row[5]),
-                                int(row[14] or 0),
-                            ))
+                            candidates[row[10], key].append(
+                                (
+                                    "geonames",
+                                    float(row[4]),
+                                    float(row[5]),
+                                    int(row[14] or 0),
+                                )
+                            )
         except (OSError, KeyError, IndexError, ValueError) as exc:
             raise CommandError(f"Cannot read source file: {exc}") from exc
 
@@ -93,7 +95,7 @@ class Command(BaseCommand):
         ambiguous = 0
 
         for state, key in sorted(wanted):
-            for source in SOURCES:
+            for source in PLACE_SOURCES:
                 matches = [c for c in candidates[state, key] if c[0] == source]
                 if not matches:
                     continue
@@ -104,20 +106,20 @@ class Command(BaseCommand):
                     ambiguous += 1
                     break
                 _, latitude, longitude, _ = max(matches, key=lambda m: m[3])
-                rows.append([state, key, f"{latitude:.6f}",
-                             f"{longitude:.6f}", source])
+                rows.append([state, key, f"{latitude:.6f}", f"{longitude:.6f}", source])
                 break
 
         output = options["output"]
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open("w", encoding="utf-8", newline="") as file:
             writer = csv.writer(file)
-            writer.writerow(["state", "place_key", "latitude", "longitude",
-                             "source"])
+            writer.writerow(["state", "place_key", "latitude", "longitude", "source"])
             writer.writerows(rows)
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Wrote {len(rows)} of {len(wanted)} USA station cities to "
-            f"{output}; ambiguous: {ambiguous}; "
-            f"missing: {len(wanted) - len(rows) - ambiguous}."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Wrote {len(rows)} of {len(wanted)} USA station cities to "
+                f"{output}; ambiguous: {ambiguous}; "
+                f"missing: {len(wanted) - len(rows) - ambiguous}."
+            )
+        )

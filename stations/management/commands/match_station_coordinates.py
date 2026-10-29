@@ -8,6 +8,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from stations.constants import DEFAULT_STATION_COORDINATES
 from stations.models import Station
 
 
@@ -16,14 +17,12 @@ def normalize(value):
 
 
 def export_exact_coordinates(path):
-    # Committed so a fresh database can restore matches without OSM files.
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["opis_id", "latitude", "longitude"])
         writer.writerows(
-            Station.objects.filter(
-                coordinate_source=Station.CoordinateSource.STATION)
+            Station.objects.filter(coordinate_source=Station.CoordinateSource.STATION)
             .order_by("opis_id")
             .values_list("opis_id", "latitude", "longitude")
         )
@@ -36,10 +35,13 @@ class Command(BaseCommand):
         parser.add_argument("input_path", type=Path)
         parser.add_argument("--state", required=True)
         parser.add_argument("--apply", action="store_true")
-        parser.add_argument("--export", type=Path,
-                            default=Path("data/station-coordinates.csv"),
-                            help="With --apply, rewrite this file with every "
-                                 "exact station coordinate.")
+        parser.add_argument(
+            "--export",
+            type=Path,
+            default=Path(DEFAULT_STATION_COORDINATES),
+            help="With --apply, rewrite this file with every "
+            "exact station coordinate.",
+        )
 
     def handle(self, *args, **options):
         state = options["state"].upper()
@@ -73,9 +75,7 @@ class Command(BaseCommand):
                         or not -90 <= latitude <= 90
                         or not -180 <= longitude <= 180
                     ):
-                        raise ValueError(
-                            f"Invalid coordinates on line {line_number}"
-                        )
+                        raise ValueError(f"Invalid coordinates on line {line_number}")
 
                     key = (brand, int(branch), city, state)
                     index[key].append((latitude, longitude))
@@ -106,7 +106,6 @@ class Command(BaseCommand):
         ambiguous = 0
 
         for station in stations:
-            # Example: "KWIK TRIP #796" -> brand and branch number.
             match = re.fullmatch(r"(.+?)\s*#\s*(\d+)", station.name.strip())
 
             if not match:
@@ -151,7 +150,9 @@ class Command(BaseCommand):
             export_exact_coordinates(options["export"])
 
         action = "Saved" if options["apply"] else "Would save"
-        self.stdout.write(self.style.SUCCESS(
-            f"{action}: {len(updates)}; "
-            f"unmatched: {unmatched}; ambiguous: {ambiguous}."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{action}: {len(updates)}; "
+                f"unmatched: {unmatched}; ambiguous: {ambiguous}."
+            )
+        )
