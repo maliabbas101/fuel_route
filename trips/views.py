@@ -8,12 +8,13 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from .boundaries import is_in_usa
 from .optimizer import optimize_fuel
 from .stations import find_route_stations
 from django.shortcuts import render
 
 
-def validate_location(value):
+def validate_location(value, label="Location"):
     if not isinstance(value, dict):
         raise ValueError("Each location must contain latitude and longitude.")
 
@@ -34,6 +35,9 @@ def validate_location(value):
     if not -180 <= longitude <= 180:
         raise ValueError("Longitude must be between -180 and 180.")
 
+    if not is_in_usa(longitude, latitude):
+        raise ValueError(f"{label} must be within the USA.")
+
     return [longitude, latitude]
 
 def trip_map(request):
@@ -48,8 +52,8 @@ def plan_trip(request):
         if not isinstance(payload, dict):
             raise ValueError("Request body must be a JSON object.")
 
-        start = validate_location(payload.get("start"))
-        finish = validate_location(payload.get("finish"))
+        start = validate_location(payload.get("start"), "Start location")
+        finish = validate_location(payload.get("finish"), "Finish location")
 
         initial_fuel = payload.get("initial_fuel_gallons", 50)
         if (
