@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fuel Route Planner</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  >
+
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      color: #172033;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: auto;
+    }
+
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+    }
+
+    input, button {
+      padding: 10px;
+      font: inherit;
+    }
+
+    input {
+      width: 140px;
+    }
+
+    button {
+      align-self: end;
+      cursor: pointer;
+    }
+
+    #map {
+      height: 500px;
+      background: #ddd;
+    }
+
+    #status {
+      white-space: pre-line;
+      margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Fuel Route Planner</h1>
+
+  <form id="trip-form">
+    <label>
+      Start latitude
+      <input id="start-lat" type="number" step="any"
+             min="-90" max="90" value="44.0188755" required>
+    </label>
+
+    <label>
+      Start longitude
+      <input id="start-lon" type="number" step="any"
+             min="-180" max="180" value="-90.50256145" required>
+    </label>
+
+    <label>
+      Finish latitude
+      <input id="finish-lat" type="number" step="any"
+             min="-90" max="90" value="43.0731" required>
+    </label>
+
+    <label>
+      Finish longitude
+      <input id="finish-lon" type="number" step="any"
+             min="-180" max="180" value="-89.4012" required>
+    </label>
+
+    <label>
+      Starting gallons
+      <input id="initial-fuel" type="number" step="any"
+             min="0" max="50" value="1" required>
+    </label>
+
+    <button id="submit-button" type="submit">Plan trip</button>
+  </form>
+
+  <p>
+    Current station coverage is limited to matched Wisconsin stations.
+    Station access distances exclude road detours.
+    Purchase cost excludes fuel already in the tank.
+  </p>
+
+  <div id="status" role="status" aria-live="polite">
+    Enter a trip and select Plan trip.
+  </div>
+
+  <div id="map" aria-label="Trip route map"></div>
+  <ol id="stops"></ol>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map("map").setView([44, -90], 7);
+
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">' +
+      'OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  const results = L.featureGroup().addTo(map);
+  const form = document.getElementById("trip-form");
+  const status = document.getElementById("status");
+  const stopsList = document.getElementById("stops");
+  const button = document.getElementById("submit-button");
+
+  function numberFrom(id) {
+    return Number(document.getElementById(id).value);
+  }
+
+  function addMarker(latitude, longitude, message) {
+    const popup = document.createElement("div");
+    popup.textContent = message;
+
+    L.marker([latitude, longitude])
+      .bindPopup(popup)
+      .addTo(results);
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    button.disabled = true;
+    results.clearLayers();
+    stopsList.replaceChildren();
+    status.textContent = "Planning trip…";
+
+    const payload = {
+      start: {
+        latitude: numberFrom("start-lat"),
+        longitude: numberFrom("start-lon")
+      },
+      finish: {
+        latitude: numberFrom("finish-lat"),
+        longitude: numberFrom("finish-lon")
+      },
+      initial_fuel_gallons: numberFrom("initial-fuel")
+    };
+
+    try {
+      const response = await fetch("{% url 'plan-trip' %}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (data.route_geojson) {
+        L.geoJSON(data.route_geojson, {
+          style: {color: "#1769e0", weight: 5}
+        }).addTo(results);
+
+        addMarker(
+          payload.start.latitude,
+          payload.start.longitude,
+          "Start"
+        );
+
+        addMarker(
+          payload.finish.latitude,
+          payload.finish.longitude,
+          "Finish"
+        );
+
+        map.fitBounds(results.getBounds(), {padding: [30, 30]});
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || "Trip planning failed.");
+      }
+
+      for (const stop of data.fuel_stops) {
+        const description =
+          `${stop.name}: buy ${Number(stop.gallons_to_buy).toFixed(2)} ` +
+          `gallons at $${Number(stop.price_per_gallon).toFixed(3)}/gal. ` +
+          `Cost: $${stop.cost_usd}.`;
+
+        addMarker(stop.latitude, stop.longitude, description);
+
+        const item = document.createElement("li");
+        item.textContent = description;
+        stopsList.appendChild(item);
+      }
+
+      status.textContent =
+        `Distance: ${data.distance_miles} miles\n` +
+        `Fuel consumed: ${data.fuel_consumed_gallons} gallons\n` +
+        `Fuel stops: ${data.fuel_stops.length}\n` +
+        `Fuel purchased: ${Number(data.fuel_purchased_gallons).toFixed(2)} gallons\n` +
+        `Purchase cost: $${data.fuel_purchase_cost_usd}\n` +
+        `Route calculated by openrouteservice.`;
+    } catch (error) {
+      status.textContent = `Unable to plan trip: ${error.message}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

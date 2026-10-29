@@ -84,3 +84,5 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

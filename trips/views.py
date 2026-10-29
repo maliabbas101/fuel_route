@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 
 from .optimizer import optimize_fuel
 from .stations import find_route_stations
+from django.shortcuts import render
 
 
 def validate_location(value):
@@ -35,6 +36,8 @@ def validate_location(value):
 
     return [longitude, latitude]
 
+def trip_map(request):
+    return render(request, "trips/map.html")
 
 @csrf_exempt
 @require_POST
