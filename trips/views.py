@@ -4,9 +4,26 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import planner
-from .constants import CONTIGUOUS_USA_BOUNDS
+from .constants import (
+    CONTIGUOUS_USA_BOUNDS,
+    MAX_RANGE_MILES,
+    MPG,
+    TANK_GALLONS,
+)
 from .exceptions import NoFeasiblePlanError, RoutingError
 from .serializers import TripRequestSerializer
+
+
+def home(request):
+    return render(
+        request,
+        "trips/home.html",
+        {
+            "mpg": MPG,
+            "tank_gallons": TANK_GALLONS,
+            "max_range_miles": MAX_RANGE_MILES,
+        },
+    )
 
 
 def trip_map(request):

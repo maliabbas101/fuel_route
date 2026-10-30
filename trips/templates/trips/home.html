@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fuel Route Planner</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      color: #172033;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 760px;
+      margin: auto;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .links a {
+      padding: 10px 16px;
+      border: 1px solid #c5cad3;
+      border-radius: 4px;
+      background: #fff;
+      color: #172033;
+      text-decoration: none;
+    }
+
+    .links a.primary {
+      border-color: #1769e0;
+      background: #1769e0;
+      color: #fff;
+    }
+
+    pre {
+      padding: 12px;
+      overflow-x: auto;
+      background: #fff;
+      border: 1px solid #dde1e7;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Fuel Route Planner</h1>
+  <p>
+    Plans a driving trip between two points in the contiguous USA and chooses
+    where to buy fuel along the way, using the supplied fuel price list.
+  </p>
+
+  <div class="links">
+    <a class="primary" href="{% url 'trip-map' %}">Plan a trip on the map</a>
+    <a href="{% url 'plan-trip' %}">Try the API</a>
+    <a href="{% url 'admin:index' %}">Admin</a>
+  </div>
+
+  <h2>Vehicle</h2>
+  <ul>
+    <li>{{ mpg }} miles per gallon and a {{ tank_gallons }}-gallon tank,
+      so {{ max_range_miles }} miles of range.</li>
+    <li>Fuel already in the tank is not counted as a purchase.</li>
+  </ul>
+
+  <h2>API</h2>
+  <p><code>POST {% url 'plan-trip' %}</code></p>
+  <pre>{
+  "start": {"latitude": 34.05223, "longitude": -118.24368},
+  "finish": {"latitude": 40.41729, "longitude": -82.90712},
+  "initial_fuel_gallons": 30
+}</pre>
+  <p>
+    The response has the route, the fuel stops with gallons and cost at each,
+    and the total purchase cost.
+  </p>
+
+  <h2>Good to know</h2>
+  <ul>
+    <li>Most station positions are their city's center, not the station itself.</li>
+    <li>Western longitudes are negative.</li>
+    <li>Routes come from openrouteservice and are cached for an hour.</li>
+  </ul>
+</main>
+</body>
+</html>

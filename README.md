@@ -41,7 +41,9 @@ Create an admin account, then start the development server:
 .\.venv\Scripts\python.exe manage.py runserver
 ```
 
-Open [Django admin](http://127.0.0.1:8000/admin/) and sign in to inspect the data.
+Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) for links to the map,
+the API and admin. Open [Django admin](http://127.0.0.1:8000/admin/) and sign
+in to inspect the data.
 Create the admin account only once. Stop the server with `Ctrl+C`.
 
 Copy `.env.example` to `.env` and set `ORS_API_KEY` to a free
